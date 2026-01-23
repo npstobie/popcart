@@ -1,0 +1,138 @@
+{% comment %}
+  PopCart - Slide-out Cart Drawer
+  This app embed block loads on every page and provides a slide-out cart experience.
+  Settings are fetched from the PopCart API and applied dynamically.
+{% endcomment %}
+
+<div
+  id="popcart-drawer"
+  class="popcart-drawer"
+  data-popcart-drawer
+  data-popcart-app-url="{{ block.settings.app_url }}"
+>
+  <!-- Overlay -->
+  <div class="popcart-overlay" data-popcart-overlay></div>
+
+  <!-- Drawer Panel -->
+  <div class="popcart-panel">
+    <!-- Header -->
+    <div class="popcart-header">
+      <h2 class="popcart-title">
+        <span data-popcart-title>Your Cart</span>
+        <span class="popcart-count" data-popcart-count>({{ cart.item_count }})</span>
+      </h2>
+      <button class="popcart-close" data-popcart-close aria-label="Close cart">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Announcement Banner -->
+    <div class="popcart-announcement" data-popcart-announcement>
+      <span data-popcart-announcement-text>Free shipping on orders over $50!</span>
+    </div>
+
+    <!-- Progress Bar / Tiered Rewards -->
+    <div class="popcart-progress-wrapper" data-popcart-progress-wrapper>
+      <p class="popcart-progress-text" data-popcart-progress-text>
+        {% assign threshold = 5000 %}
+        {% assign cart_total = cart.total_price %}
+        {% assign remaining = threshold | minus: cart_total %}
+        {% if remaining > 0 %}
+          Add <strong>{{ remaining | money }}</strong> more for FREE shipping!
+        {% else %}
+          You've unlocked FREE shipping!
+        {% endif %}
+      </p>
+      <div class="popcart-progress-bar" data-popcart-progress>
+        {% assign progress = cart_total | times: 100 | divided_by: threshold %}
+        {% if progress > 100 %}{% assign progress = 100 %}{% endif %}
+        <div class="popcart-progress-fill" data-popcart-progress-fill style="width: {{ progress }}%"></div>
+      </div>
+      <!-- Tier indicators will be rendered by JS -->
+    </div>
+
+    <!-- Cart Items -->
+    <div class="popcart-items" data-popcart-items>
+      {% if cart.item_count > 0 %}
+        {% for item in cart.items %}
+          <div class="popcart-item" data-popcart-item data-line-key="{{ item.key }}">
+            <div class="popcart-item-image" data-popcart-item-image>
+              {% if item.image %}
+                <img src="{{ item.image | image_url: width: 120 }}" alt="{{ item.title | escape }}" width="80" height="80" loading="lazy">
+              {% else %}
+                <div class="popcart-item-placeholder"></div>
+              {% endif %}
+            </div>
+            <div class="popcart-item-details">
+              <a href="{{ item.url }}" class="popcart-item-title">{{ item.product.title }}</a>
+              {% if item.product.vendor and item.product.vendor != blank %}
+                <p class="popcart-item-vendor is-hidden" data-popcart-vendor>{{ item.product.vendor }}</p>
+              {% endif %}
+              {% unless item.variant.title == 'Default Title' %}
+                <p class="popcart-item-variant" data-popcart-variant>{{ item.variant.title }}</p>
+              {% endunless %}
+              <div class="popcart-item-price">
+                {{ item.final_line_price | money }}
+              </div>
+              <div class="popcart-quantity" data-popcart-quantity-wrapper>
+                <button class="popcart-qty-btn" data-popcart-decrease data-line-key="{{ item.key }}" aria-label="Decrease quantity">−</button>
+                <input type="number" class="popcart-qty-input" value="{{ item.quantity }}" min="1" data-popcart-quantity data-line-key="{{ item.key }}" aria-label="Quantity">
+                <button class="popcart-qty-btn" data-popcart-increase data-line-key="{{ item.key }}" aria-label="Increase quantity">+</button>
+              </div>
+            </div>
+            <button class="popcart-item-remove" data-popcart-remove data-line-key="{{ item.key }}" aria-label="Remove item">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="popcart-empty" data-popcart-empty>
+          <p data-popcart-empty-text>Your cart is empty</p>
+          <a href="{{ routes.all_products_collection_url }}" class="popcart-continue-btn" data-popcart-empty-btn>Continue Shopping</a>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Footer -->
+    <div class="popcart-footer" data-popcart-footer {% if cart.item_count == 0 %}style="display: none;"{% endif %}>
+      <div class="popcart-subtotal" data-popcart-subtotal-wrapper>
+        <span data-popcart-subtotal-label>Subtotal</span>
+        <span data-popcart-subtotal>{{ cart.total_price | money }}</span>
+      </div>
+      <p class="popcart-shipping-note" data-popcart-shipping-note>Shipping & taxes calculated at checkout</p>
+      <a href="/checkout" class="popcart-checkout-btn" data-popcart-checkout>
+        Checkout
+      </a>
+      <a href="{{ routes.cart_url }}" class="popcart-viewcart-link" data-popcart-viewcart>View Cart</a>
+    </div>
+  </div>
+</div>
+
+{{ 'popcart.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'popcart.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "PopCart Drawer",
+  "target": "body",
+  "javascript": "popcart.js",
+  "stylesheet": "popcart.css",
+  "settings": [
+    {
+      "type": "header",
+      "content": "App Configuration"
+    },
+    {
+      "type": "text",
+      "id": "app_url",
+      "label": "PopCart App URL",
+      "info": "Enter your PopCart app URL (e.g., https://your-app.trycloudflare.com)",
+      "placeholder": "https://your-app.trycloudflare.com"
+    }
+  ]
+}
+{% endschema %}

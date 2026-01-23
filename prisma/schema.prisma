@@ -1,0 +1,216 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "sqlite"
+  url      = "file:dev.sqlite"
+}
+
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+// ============================================
+// PopCart Settings Models
+// ============================================
+
+model CartSettings {
+  id        String   @id @default(cuid())
+  shop      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // General Settings
+  enabled          Boolean @default(true)
+  cartTitle        String  @default("Your Cart")
+  emptyCartText    String  @default("Your cart is empty")
+  emptyCartBtnText String  @default("Continue Shopping")
+  emptyCartBtnUrl  String  @default("/collections/all")
+
+  // Announcement Bar
+  announcementEnabled   Boolean @default(true)
+  announcementText      String  @default("Free shipping on orders over $50!")
+  announcementBgColor   String  @default("#000000")
+  announcementTextColor String  @default("#ffffff")
+  announcementLink      String?
+  announcementIcon      String?
+
+  // Announcement Timer
+  timerEnabled          Boolean   @default(false)
+  timerType             String    @default("daily") // daily, fixed, session
+  timerDailyReset       String    @default("00:00") // Time to reset daily (HH:mm)
+  timerFixedEnd         DateTime? // Fixed end date/time
+  timerDuration         Int       @default(30) // Duration in minutes for session timer
+  timerExpiredAction    String    @default("hide") // hide, show_expired
+
+  // Spend Threshold Progress Bar
+  progressBarEnabled   Boolean @default(true)
+  progressBarBgColor   String  @default("#e5e7eb")
+  progressBarFillColor String  @default("#10b981")
+  progressBarTextColor String  @default("#1a1a1a")
+
+  // Buy X Get Y Progress Bar
+  bxgyEnabled          Boolean @default(false)
+  bxgyBgColor          String  @default("#e5e7eb")
+  bxgyFillColor        String  @default("#6366f1")
+  bxgyTextColor        String  @default("#1a1a1a")
+
+  // Cart Footer
+  checkoutBtnText     String  @default("Checkout")
+  checkoutBtnBgColor  String  @default("#000000")
+  checkoutBtnTextColor String @default("#ffffff")
+  showViewCartLink    Boolean @default(true)
+  showSubtotal        Boolean @default(true)
+  subtotalLabel       String  @default("Subtotal")
+  taxShippingNote     String  @default("Shipping & taxes calculated at checkout")
+
+  // Upsells Section
+  upsellsEnabled Boolean @default(false)
+  upsellsTitle   String  @default("You may also like")
+  upsellsStyle   String  @default("list") // carousel, grid, list
+
+  // Add-ons Section
+  addOnsEnabled Boolean @default(false)
+  addOnsTitle   String  @default("Add to your order")
+
+  // Styling
+  drawerWidth       Int     @default(420)
+  drawerPosition    String  @default("right") // left, right
+  overlayColor      String  @default("rgba(0, 0, 0, 0.5)")
+  drawerBgColor     String  @default("#ffffff")
+  drawerTextColor   String  @default("#1a1a1a")
+  drawerBorderRadius Int    @default(0)
+  fontFamily        String  @default("inherit")
+
+  // Cart Item Display
+  showItemImage      Boolean @default(true)
+  showItemVariant    Boolean @default(true)
+  showItemVendor     Boolean @default(false)
+  showQuantitySelector Boolean @default(true)
+  showRemoveButton   Boolean @default(true)
+  itemImageSize      Int     @default(80)
+
+  // Relations
+  rewardTiers  RewardTier[]
+  upsells      Upsell[]
+  addOns       AddOn[]
+  bxgyOffers   BuyXGetYOffer[]
+}
+
+model RewardTier {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Tier Settings
+  threshold   Int                // Amount in cents
+  rewardType  String             // free_shipping, discount_percent, discount_fixed, free_gift
+  rewardValue String?            // Discount amount, gift product ID, etc.
+  title       String             // e.g., "Free Shipping"
+  message     String             // e.g., "You've unlocked free shipping!"
+  icon        String?            // Icon name or URL
+  sortOrder   Int      @default(0)
+
+  // Relation
+  cartSettingsId String
+  cartSettings   CartSettings @relation(fields: [cartSettingsId], references: [id], onDelete: Cascade)
+}
+
+model Upsell {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Upsell Settings
+  productId       String  // Shopify product GID
+  productHandle   String? // Product handle for URL
+  titleOverride   String? // Custom title (optional)
+  sortOrder       Int     @default(0)
+  showOnlyIfEmpty Boolean @default(false) // Show only if cart doesn't have this product
+
+  // Relation
+  cartSettingsId String
+  cartSettings   CartSettings @relation(fields: [cartSettingsId], references: [id], onDelete: Cascade)
+}
+
+model AddOn {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Add-on Settings
+  productId     String  // Shopify product GID
+  productHandle String? // Product handle
+  variantId     String? // Specific variant (optional)
+  titleOverride String? // Custom title
+  priceOverride Int?    // Custom price in cents (optional)
+  icon          String? // Emoji icon for display
+  sortOrder     Int     @default(0)
+
+  // Relation
+  cartSettingsId String
+  cartSettings   CartSettings @relation(fields: [cartSettingsId], references: [id], onDelete: Cascade)
+}
+
+model BuyXGetYOffer {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Offer Configuration
+  title           String   @default("Buy More, Save More")
+  buyQuantity     Int      @default(3)      // Number of items to buy
+  getQuantity     Int      @default(1)      // Number of free items
+
+  // Reward Mode: how the free items work
+  // cheapest_in_cart: Cheapest items in cart become free (all items eligible)
+  // selection: Customer picks from a preset selection of free products
+  // automatic: A preset product is auto-added to cart
+  rewardMode      String   @default("cheapest_in_cart")
+
+  // Qualifying Products (which products count toward the buy X requirement)
+  appliesToType   String   @default("all")  // all, collection, products
+  collectionId    String?                   // If appliesToType is collection
+  productIds      String?                   // JSON array of product IDs if appliesToType is products
+
+  // Selection Mode Settings
+  selectionProductIds   String?             // JSON array of product IDs customers can choose from
+  selectionDisplayStyle String  @default("list") // carousel, grid, list
+  selectionTitle        String  @default("Choose your free item(s)")
+
+  // Automatic Mode Settings
+  automaticProductId    String?             // Product ID to auto-add
+  automaticProductHandle String?            // Product handle for lookup
+
+  // Display Messages
+  message         String   @default("Add {remaining} more to get {free} free!")
+  completedMessage String  @default("🎉 You've unlocked {free} free item(s)!")
+  sortOrder       Int      @default(0)
+
+  // Relation
+  cartSettingsId String
+  cartSettings   CartSettings @relation(fields: [cartSettingsId], references: [id], onDelete: Cascade)
+}
