@@ -1394,13 +1394,23 @@
       // Calculate qualifying quantity from cart (excluding BXGY free items)
       const qualifyingQty = this.calculateBxgyQualifyingQuantity(cart, offer);
 
-      // Calculate earned free items
+      // Calculate earned free items based on reward mode
       const buyQty = offer.buyQuantity || 3;
       const getQty = offer.getQuantity || 1;
-      const earnedFreeItems = Math.floor(qualifyingQty / buyQty) * getQty;
+      const rewardMode = offer.rewardMode || 'cheapest_in_cart';
+
+      let earnedFreeItems;
+      if (rewardMode === 'cheapest_in_cart') {
+        // For cheapest_in_cart: you must have MORE than buyQty to earn free items
+        // Buy 3 Get 3: with 4 items = 1 free, 5 items = 2 free, 6 items = 3 free
+        earnedFreeItems = Math.max(0, Math.min(getQty, qualifyingQty - buyQty));
+      } else {
+        // For selection/automatic modes: use cycle-based calculation
+        earnedFreeItems = Math.floor(qualifyingQty / buyQty) * getQty;
+      }
 
       // Track free items for cheapest_in_cart mode
-      if (offer.rewardMode === 'cheapest_in_cart') {
+      if (rewardMode === 'cheapest_in_cart') {
         this.bxgyFreeItemKeys = this.calculateCheapestFreeItems(cart, offer, earnedFreeItems);
       } else {
         this.bxgyFreeItemKeys = new Set();
@@ -1564,28 +1574,73 @@
       const totalSlots = buyQty + getQty;
       const rewardMode = offer.rewardMode || 'cheapest_in_cart';
 
-      // Calculate progress
-      const completedCycles = Math.floor(currentQty / buyQty);
-      const itemsInCurrentCycle = currentQty % buyQty;
-      const remaining = buyQty - itemsInCurrentCycle;
-      const showComplete = currentQty >= buyQty;
+      // Calculate progress differently based on mode
+      let filledSlots, remaining, hasEarnedFree, modeInfo, shortMessage;
 
-      // Determine which slots are filled (for current cycle)
-      const filledSlots = showComplete ? buyQty : itemsInCurrentCycle;
+      if (rewardMode === 'cheapest_in_cart') {
+        // For cheapest_in_cart: fill numbered boxes 1-buyQty, then FREE boxes light up for items beyond buyQty
+        // Buy 3 Get 3: items 1-3 fill boxes 1-3, items 4-6 light up FREE boxes
+        filledSlots = Math.min(currentQty, buyQty);
+        remaining = Math.max(0, buyQty - currentQty + 1); // +1 because you need 1 more than buyQty to earn first free
+        hasEarnedFree = earnedFreeItems > 0;
 
-      // Generate message based on mode
-      let message;
-      if (currentQty === 0) {
-        message = offer.message
-          .replace('{remaining}', buyQty.toString())
-          .replace('{free}', getQty.toString());
-      } else if (!showComplete) {
-        message = offer.message
-          .replace('{remaining}', remaining.toString())
-          .replace('{free}', getQty.toString());
+        // Messages for cheapest_in_cart mode
+        if (currentQty <= buyQty) {
+          // Still filling up the "buy" slots
+          const itemsNeeded = buyQty - currentQty + 1; // Need 1 more than buyQty for first free
+          shortMessage = `Add ${itemsNeeded} for free item`;
+        } else if (earnedFreeItems < getQty) {
+          // Have some free items, can earn more
+          const moreForNextFree = 1; // Each additional item = 1 more free
+          shortMessage = `🎉 ${earnedFreeItems} free! Add ${moreForNextFree} for ${earnedFreeItems + 1}`;
+        } else {
+          // Maxed out free items
+          shortMessage = `🎉 ${earnedFreeItems} free!`;
+        }
+
+        // Mode info text
+        if (earnedFreeItems > 0) {
+          modeInfo = `<div class="popcart-bxgy-mode-info">The cheapest ${earnedFreeItems} item${earnedFreeItems > 1 ? 's' : ''} in your cart ${earnedFreeItems > 1 ? 'are' : 'is'} free!</div>`;
+        } else if (currentQty >= buyQty) {
+          modeInfo = `<div class="popcart-bxgy-mode-info">Add 1 more item to get the cheapest free!</div>`;
+        } else {
+          modeInfo = '';
+        }
       } else {
-        message = offer.completedMessage
-          .replace('{free}', (getQty * completedCycles).toString());
+        // For selection/automatic modes: use cycle-based calculation
+        const completedCycles = Math.floor(currentQty / buyQty);
+        const itemsInCurrentCycle = currentQty % buyQty;
+        remaining = buyQty - itemsInCurrentCycle;
+        const showComplete = currentQty >= buyQty;
+        filledSlots = showComplete ? buyQty : itemsInCurrentCycle;
+        hasEarnedFree = showComplete;
+
+        // Messages for selection/automatic modes
+        if (!showComplete) {
+          shortMessage = `Add ${remaining} more`;
+          modeInfo = '';
+        } else {
+          const totalEarned = getQty * completedCycles;
+          const remainingFree = totalEarned - freeItemsInCart;
+
+          if (rewardMode === 'selection') {
+            if (remainingFree > 0) {
+              shortMessage = `🎁 ${remainingFree} free to claim`;
+              modeInfo = `<div class="popcart-bxgy-mode-info">Choose ${remainingFree} free item${remainingFree > 1 ? 's' : ''} below!</div>`;
+            } else {
+              shortMessage = `🎉 ${freeItemsInCart} free!`;
+              modeInfo = `<div class="popcart-bxgy-mode-info">You've claimed all your free items!</div>`;
+            }
+          } else if (rewardMode === 'automatic') {
+            if (remainingFree > 0) {
+              shortMessage = `🎁 Adding free items...`;
+              modeInfo = `<div class="popcart-bxgy-mode-info">Adding your free item${remainingFree > 1 ? 's' : ''}...</div>`;
+            } else {
+              shortMessage = `🎉 ${freeItemsInCart} free!`;
+              modeInfo = `<div class="popcart-bxgy-mode-info">Your free item${freeItemsInCart > 1 ? 's have' : ' has'} been added!</div>`;
+            }
+          }
+        }
       }
 
       // Build the boxes HTML
@@ -1595,17 +1650,15 @@
         const isFilled = !isFreeSlot && slotNum <= filledSlots;
 
         // For FREE slots, determine if they're "earned" (highlighted)
-        // - cheapest_in_cart: Items are already in cart, highlight immediately when threshold met
-        // - selection/automatic: Only highlight when actual free items are in cart
         let isFreeEarned = false;
-        if (isFreeSlot && showComplete) {
+        if (isFreeSlot) {
           const freeSlotIndex = slotNum - buyQty; // 1-based index of this free slot
           if (rewardMode === 'cheapest_in_cart') {
-            // Cheapest items in cart become free immediately
+            // Cheapest items in cart: highlight based on earnedFreeItems
             isFreeEarned = freeSlotIndex <= earnedFreeItems;
           } else {
             // Selection/automatic: only highlight if free item is actually in cart
-            isFreeEarned = freeSlotIndex <= freeItemsInCart;
+            isFreeEarned = hasEarnedFree && freeSlotIndex <= freeItemsInCart;
           }
         }
 
@@ -1618,47 +1671,6 @@
 
         return `<div class="${boxClass}">${label}</div>`;
       }).join('');
-
-      // Mode-specific info text
-      let modeInfo = '';
-      if (showComplete) {
-        const totalEarned = getQty * completedCycles;
-        const remainingFree = totalEarned - freeItemsInCart;
-
-        if (rewardMode === 'cheapest_in_cart') {
-          modeInfo = `<div class="popcart-bxgy-mode-info">The cheapest ${earnedFreeItems} item${earnedFreeItems > 1 ? 's' : ''} in your cart ${earnedFreeItems > 1 ? 'are' : 'is'} free!</div>`;
-        } else if (rewardMode === 'selection') {
-          if (remainingFree > 0) {
-            modeInfo = `<div class="popcart-bxgy-mode-info">Choose ${remainingFree} free item${remainingFree > 1 ? 's' : ''} below!</div>`;
-          } else {
-            modeInfo = `<div class="popcart-bxgy-mode-info">You've claimed all your free items!</div>`;
-          }
-        } else if (rewardMode === 'automatic') {
-          if (remainingFree > 0) {
-            modeInfo = `<div class="popcart-bxgy-mode-info">Adding your free item${remainingFree > 1 ? 's' : ''}...</div>`;
-          } else {
-            modeInfo = `<div class="popcart-bxgy-mode-info">Your free item${freeItemsInCart > 1 ? 's have' : ' has'} been added!</div>`;
-          }
-        }
-      }
-
-      // Compact horizontal layout: boxes on left, message on right
-      let shortMessage;
-      if (!showComplete) {
-        shortMessage = `Add ${remaining} more`;
-      } else if (rewardMode === 'cheapest_in_cart') {
-        // Cheapest items mode - free items are already "claimed"
-        shortMessage = `🎉 ${earnedFreeItems} free!`;
-      } else {
-        // Selection/automatic - show how many free items have been added
-        const totalEarned = getQty * completedCycles;
-        const remainingFree = totalEarned - freeItemsInCart;
-        if (remainingFree > 0) {
-          shortMessage = `🎁 ${remainingFree} free to claim`;
-        } else {
-          shortMessage = `🎉 ${freeItemsInCart} free!`;
-        }
-      }
 
       bxgySection.innerHTML = `
         <div class="popcart-bxgy-row">
