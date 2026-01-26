@@ -840,22 +840,20 @@
 
         if (increase) {
           const key = increase.dataset.lineKey;
-          const input = this.drawer.querySelector(`${SELECTORS.quantity}[data-line-key="${key}"]`);
-          if (input) {
-            this.updateQuantity(key, parseInt(input.value) + 1);
-          }
+          // Use actual quantity from data attribute (handles split tiles correctly)
+          const actualQty = parseInt(increase.dataset.actualQty) || 1;
+          this.updateQuantity(key, actualQty + 1);
         }
 
         if (decrease) {
           const key = decrease.dataset.lineKey;
-          const input = this.drawer.querySelector(`${SELECTORS.quantity}[data-line-key="${key}"]`);
-          if (input) {
-            const newQty = parseInt(input.value) - 1;
-            if (newQty > 0) {
-              this.updateQuantity(key, newQty);
-            } else {
-              this.removeItem(key);
-            }
+          // Use actual quantity from data attribute (handles split tiles correctly)
+          const actualQty = parseInt(decrease.dataset.actualQty) || 1;
+          const newQty = actualQty - 1;
+          if (newQty > 0) {
+            this.updateQuantity(key, newQty);
+          } else {
+            this.removeItem(key);
           }
         }
 
@@ -1244,9 +1242,9 @@
                 </div>
                 ${showQuantity && canEditQuantity ? `
                   <div class="popcart-quantity" data-popcart-quantity-wrapper>
-                    <button class="popcart-qty-btn" data-popcart-decrease data-line-key="${item.key}" aria-label="Decrease quantity">−</button>
-                    <input type="number" class="popcart-qty-input" value="${item.displayQty}" min="1" data-popcart-quantity data-line-key="${item.key}" aria-label="Quantity">
-                    <button class="popcart-qty-btn${disablePlus ? ' popcart-qty-btn--disabled' : ''}" data-popcart-increase data-line-key="${item.key}" aria-label="Increase quantity"${disablePlus ? ' disabled' : ''}>+</button>
+                    <button class="popcart-qty-btn" data-popcart-decrease data-line-key="${item.key}" data-actual-qty="${item.quantity}" aria-label="Decrease quantity">−</button>
+                    <input type="number" class="popcart-qty-input" value="${item.displayQty}" min="1" data-popcart-quantity data-line-key="${item.key}" data-actual-qty="${item.quantity}" aria-label="Quantity" readonly>
+                    <button class="popcart-qty-btn${disablePlus ? ' popcart-qty-btn--disabled' : ''}" data-popcart-increase data-line-key="${item.key}" data-actual-qty="${item.quantity}" aria-label="Increase quantity"${disablePlus ? ' disabled' : ''}>+</button>
                   </div>
                 ` : ''}
               </div>
