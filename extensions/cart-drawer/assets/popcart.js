@@ -1124,8 +1124,20 @@
         return sum;
       }, 0);
 
-      // Are we at max free items?
+      // Are we at max free items? (for selection/automatic modes)
       const atMaxFreeItems = currentFreeItems >= maxFreeItems;
+
+      // Calculate max cheapest-free items (for cheapest_in_cart mode)
+      const rewardMode = offer?.rewardMode || 'cheapest_in_cart';
+      const maxCheapestFree = rewardMode === 'cheapest_in_cart' ? getQty : 0;
+      // Count current cheapest-free items from the map
+      let totalCheapestFree = 0;
+      if (this.bxgyFreeItemKeys) {
+        for (const freeQty of this.bxgyFreeItemKeys.values()) {
+          totalCheapestFree += freeQty;
+        }
+      }
+      const atMaxCheapestFree = totalCheapestFree >= maxCheapestFree;
 
       // Build array of items to render, splitting items with partial free quantities
       const itemsToRender = [];
@@ -1184,10 +1196,12 @@
         // They can be removed AND have quantity edited (additional qty added as paid)
         // Only spend-threshold free gifts get the special styling
         const isSpendThresholdGift = isFreeGift && !isBxgyFree;
-        // Free portion tiles from splits are display-only (no qty controls)
-        const isSplitFreeTile = item.isFreePortionSplit;
-        const canEditQuantity = !isSpendThresholdGift && !isSplitFreeTile;
-        const canRemove = !isSpendThresholdGift && !isSplitFreeTile;
+        // Check if this is a cheapest-free split tile (both paid and free portions can have qty controls)
+        const isCheapestFreeTile = item.isFreePortionSplit || item.isAllFree;
+        const canEditQuantity = !isSpendThresholdGift;
+        const canRemove = !isSpendThresholdGift;
+        // Disable + on cheapest-free tiles when at max free items
+        const disablePlus = (isBxgyFree && atMaxFreeItems) || (isCheapestFreeTile && atMaxCheapestFree);
 
         return `
           <div class="popcart-item ${isSpendThresholdGift ? 'popcart-item--free-gift' : ''} ${isCheapestFree ? 'popcart-item--cheapest-free' : ''}" data-popcart-item data-line-key="${item.key}">
@@ -1232,13 +1246,9 @@
                   <div class="popcart-quantity" data-popcart-quantity-wrapper>
                     <button class="popcart-qty-btn" data-popcart-decrease data-line-key="${item.key}" aria-label="Decrease quantity">−</button>
                     <input type="number" class="popcart-qty-input" value="${item.displayQty}" min="1" data-popcart-quantity data-line-key="${item.key}" aria-label="Quantity">
-                    <button class="popcart-qty-btn${isBxgyFree && atMaxFreeItems ? ' popcart-qty-btn--disabled' : ''}" data-popcart-increase data-line-key="${item.key}" aria-label="Increase quantity"${isBxgyFree && atMaxFreeItems ? ' disabled' : ''}>+</button>
+                    <button class="popcart-qty-btn${disablePlus ? ' popcart-qty-btn--disabled' : ''}" data-popcart-increase data-line-key="${item.key}" aria-label="Increase quantity"${disablePlus ? ' disabled' : ''}>+</button>
                   </div>
-                ` : `
-                  <div class="popcart-quantity-display">
-                    <span>Qty: ${item.displayQty}</span>
-                  </div>
-                `}
+                ` : ''}
               </div>
             </div>
             ${showRemove && canRemove ? `
