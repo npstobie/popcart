@@ -1231,7 +1231,7 @@
                 ${showQuantity && canEditQuantity ? `
                   <div class="popcart-quantity" data-popcart-quantity-wrapper>
                     <button class="popcart-qty-btn" data-popcart-decrease data-line-key="${item.key}" aria-label="Decrease quantity">−</button>
-                    <input type="number" class="popcart-qty-input" value="${item.quantity}" min="1" data-popcart-quantity data-line-key="${item.key}" aria-label="Quantity">
+                    <input type="number" class="popcart-qty-input" value="${item.displayQty}" min="1" data-popcart-quantity data-line-key="${item.key}" aria-label="Quantity">
                     <button class="popcart-qty-btn${isBxgyFree && atMaxFreeItems ? ' popcart-qty-btn--disabled' : ''}" data-popcart-increase data-line-key="${item.key}" aria-label="Increase quantity"${isBxgyFree && atMaxFreeItems ? ' disabled' : ''}>+</button>
                   </div>
                 ` : `
