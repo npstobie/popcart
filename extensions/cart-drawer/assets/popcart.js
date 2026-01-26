@@ -53,7 +53,7 @@
       this.isApplyingBxgy = false;
       this.lastBxgyState = { earnedCycles: 0, earnedFreeItems: 0 };
       this.isInternalCartUpdate = false;
-      this.bxgyFreeItemKeys = new Set();
+      this.bxgyFreeItemKeys = new Map(); // Map of itemKey -> freeQuantity
       this.selectionPickerActive = false;
       this.lastBxgyActionTime = 0;
       this.isAddingSelectionItem = false;
@@ -1127,21 +1127,67 @@
       // Are we at max free items?
       const atMaxFreeItems = currentFreeItems >= maxFreeItems;
 
-      itemsContainer.innerHTML = cart.items.map(item => {
+      // Build array of items to render, splitting items with partial free quantities
+      const itemsToRender = [];
+      for (const item of cart.items) {
+        const freeQty = this.bxgyFreeItemKeys?.get(item.key) || 0;
+        const paidQty = item.quantity - freeQty;
+
+        // If item has both paid and free units, split into two tiles
+        if (freeQty > 0 && paidQty > 0) {
+          // First tile: paid units
+          itemsToRender.push({
+            ...item,
+            displayQty: paidQty,
+            isPaidPortion: true,
+            isFreePortionSplit: false,
+            final_line_price: item.price * paidQty
+          });
+          // Second tile: free units
+          itemsToRender.push({
+            ...item,
+            displayQty: freeQty,
+            isPaidPortion: false,
+            isFreePortionSplit: true,
+            final_line_price: item.price * freeQty
+          });
+        } else if (freeQty > 0 && paidQty === 0) {
+          // All units are free
+          itemsToRender.push({
+            ...item,
+            displayQty: item.quantity,
+            isPaidPortion: false,
+            isFreePortionSplit: false,
+            isAllFree: true
+          });
+        } else {
+          // Regular item (no free units from cheapest_in_cart)
+          itemsToRender.push({
+            ...item,
+            displayQty: item.quantity,
+            isPaidPortion: true,
+            isFreePortionSplit: false
+          });
+        }
+      }
+
+      itemsContainer.innerHTML = itemsToRender.map(item => {
         const imageUrl = item.image ? this.getSizedImageUrl(item.image, imageSize * 2) : '';
         const variantTitle = item.variant_title && item.variant_title !== 'Default Title' ? item.variant_title : '';
         const isFreeGift = item.properties?.['_popcart_free_gift'] === 'true';
         const isBxgyFree = item.properties?.['_popcart_bxgy_free'] === 'true';
-        // Check if this item is marked as free by cheapest_in_cart mode
-        const isCheapestFree = this.bxgyFreeItemKeys?.has(item.key) || false;
+        // Check if this is a free portion from cheapest_in_cart split
+        const isCheapestFree = item.isFreePortionSplit || item.isAllFree || false;
         const giftName = item.properties?.['_popcart_gift_name'] || 'Free Gift';
 
         // BXGY free items render as normal items but with $0.00 price
         // They can be removed AND have quantity edited (additional qty added as paid)
         // Only spend-threshold free gifts get the special styling
         const isSpendThresholdGift = isFreeGift && !isBxgyFree;
-        const canEditQuantity = !isSpendThresholdGift; // BXGY free items CAN have qty edited
-        const canRemove = !isSpendThresholdGift; // BXGY free items CAN be removed
+        // Free portion tiles from splits are display-only (no qty controls)
+        const isSplitFreeTile = item.isFreePortionSplit;
+        const canEditQuantity = !isSpendThresholdGift && !isSplitFreeTile;
+        const canRemove = !isSpendThresholdGift && !isSplitFreeTile;
 
         return `
           <div class="popcart-item ${isSpendThresholdGift ? 'popcart-item--free-gift' : ''} ${isCheapestFree ? 'popcart-item--cheapest-free' : ''}" data-popcart-item data-line-key="${item.key}">
@@ -1153,7 +1199,7 @@
                   <div class="popcart-item-placeholder"></div>
                 `}
                 ${isSpendThresholdGift ? '<div class="popcart-item-gift-badge">🎁</div>' : ''}
-                ${isCheapestFree ? '<div class="popcart-item-cheapest-badge">DEAL</div>' : ''}
+                ${isCheapestFree ? '<div class="popcart-item-cheapest-badge">FREE</div>' : ''}
               </div>
             ` : ''}
             <div class="popcart-item-details">
@@ -1165,7 +1211,7 @@
                 <p class="popcart-item-bxgy-label">🛒 ${this.escapeHtml(giftName)}</p>
               ` : ''}
               ${isCheapestFree ? `
-                <p class="popcart-item-gift-label">🏷️ Cheapest Item Discount</p>
+                <p class="popcart-item-gift-label">🏷️ Cheapest Item Free!</p>
               ` : ''}
               ${showVendor && item.vendor && !isSpendThresholdGift ? `
                 <p class="popcart-item-vendor">${this.escapeHtml(item.vendor)}</p>
@@ -1188,7 +1234,11 @@
                     <input type="number" class="popcart-qty-input" value="${item.quantity}" min="1" data-popcart-quantity data-line-key="${item.key}" aria-label="Quantity">
                     <button class="popcart-qty-btn${isBxgyFree && atMaxFreeItems ? ' popcart-qty-btn--disabled' : ''}" data-popcart-increase data-line-key="${item.key}" aria-label="Increase quantity"${isBxgyFree && atMaxFreeItems ? ' disabled' : ''}>+</button>
                   </div>
-                ` : ''}
+                ` : `
+                  <div class="popcart-quantity-display">
+                    <span>Qty: ${item.displayQty}</span>
+                  </div>
+                `}
               </div>
             </div>
             ${showRemove && canRemove ? `
@@ -1383,7 +1433,7 @@
           existingSection.classList.add(CLASSES.hidden);
         }
         // Clear any tracked free items for cheapest mode
-        this.bxgyFreeItemKeys = new Set();
+        this.bxgyFreeItemKeys = new Map();
         return;
       }
 
@@ -1413,7 +1463,7 @@
       if (rewardMode === 'cheapest_in_cart') {
         this.bxgyFreeItemKeys = this.calculateCheapestFreeItems(cart, offer, earnedFreeItems);
       } else {
-        this.bxgyFreeItemKeys = new Set();
+        this.bxgyFreeItemKeys = new Map();
       }
 
       // Count actual BXGY free items in cart (for selection/automatic modes)
@@ -1440,10 +1490,10 @@
 
     /**
      * Calculate which items should be marked as free (cheapest items mode)
-     * Returns a Set of item keys that should be free
+     * Returns a Map of item keys -> number of free units for that item
      */
     calculateCheapestFreeItems(cart, offer, numFreeItems) {
-      if (numFreeItems <= 0) return new Set();
+      if (numFreeItems <= 0) return new Map();
 
       // Get qualifying items sorted by price (cheapest first)
       const qualifyingItems = (cart?.items || [])
@@ -1459,20 +1509,20 @@
         }))
         .sort((a, b) => a.unitPrice - b.unitPrice);
 
-      // Collect keys of cheapest items up to numFreeItems
-      const freeKeys = new Set();
+      // Collect keys and quantities of cheapest items up to numFreeItems
+      const freeItemsMap = new Map();
       let remaining = numFreeItems;
 
       for (const item of qualifyingItems) {
         if (remaining <= 0) break;
 
         const freeFromThisItem = Math.min(item.quantity, remaining);
-        // We track the whole item key, but the render will show how many are free
-        freeKeys.add(item.key);
+        // Track how many units of this item are free
+        freeItemsMap.set(item.key, freeFromThisItem);
         remaining -= freeFromThisItem;
       }
 
-      return freeKeys;
+      return freeItemsMap;
     }
 
     /**

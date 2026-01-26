@@ -1014,6 +1014,18 @@
   margin: 0;
 }
 
+/* Quantity Display (for split free items) */
+.popcart-quantity-display {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 13px;
+  color: var(--popcart-text-muted);
+  background: var(--popcart-border);
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
 /* Remove Button */
 .popcart-item-remove {
   position: absolute;
