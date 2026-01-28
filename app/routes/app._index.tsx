@@ -1169,37 +1169,37 @@ export default function Settings() {
                   <>
                     {/* BXGY Offers Configuration */}
                     <BlockStack gap="400">
-                      <InlineStack align="space-between">
-                        <Text as="span" variant="headingSm">Offers</Text>
-                        <Button
-                          onClick={() => {
-                            setBxgyOffers([...bxgyOffers, {
-                              id: `new-${Date.now()}`,
-                              title: "Buy More, Save More",
-                              buyQuantity: 3,
-                              getQuantity: 1,
-                              rewardMode: "cheapest_in_cart",
-                              appliesToType: "all",
-                              collectionId: undefined,
-                              productIds: undefined,
-                              selectionProducts: [],
-                              selectionDisplayStyle: "list",
-                              selectionTitle: "Choose your free item(s)",
-                              automaticProductId: undefined,
-                              automaticProductHandle: undefined,
-                              message: "Add {remaining} more to get {free} free!",
-                              completedMessage: "🎉 You've unlocked {free} free item(s)!",
-                              sortOrder: bxgyOffers.length,
-                            }]);
-                          }}
-                        >
-                          Add offer
-                        </Button>
-                      </InlineStack>
+                      <Text as="span" variant="headingSm">Offer</Text>
 
                       {bxgyOffers.length === 0 ? (
                         <Banner tone="info">
                           <p>Add a Buy X Get Y offer to create a quantity-based progress bar.</p>
+                          <Box paddingBlockStart="200">
+                            <Button
+                              onClick={() => {
+                                setBxgyOffers([{
+                                  id: `new-${Date.now()}`,
+                                  title: "Buy More, Save More",
+                                  buyQuantity: 3,
+                                  getQuantity: 1,
+                                  rewardMode: "cheapest_in_cart",
+                                  appliesToType: "all",
+                                  collectionId: undefined,
+                                  productIds: undefined,
+                                  selectionProducts: [],
+                                  selectionDisplayStyle: "list",
+                                  selectionTitle: "Choose your free item(s)",
+                                  automaticProductId: undefined,
+                                  automaticProductHandle: undefined,
+                                  message: "Add {remaining} more to get {free} free!",
+                                  completedMessage: "🎉 You've unlocked {free} free item(s)!",
+                                  sortOrder: 0,
+                                }]);
+                              }}
+                            >
+                              Add offer
+                            </Button>
+                          </Box>
                         </Banner>
                       ) : (
                         <BlockStack gap="400">
